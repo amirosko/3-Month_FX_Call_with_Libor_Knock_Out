@@ -1,0 +1,125 @@
+\documentclass[11pt, letterpaper]{article}
+
+\usepackage[margin=1in]{geometry}
+
+\usepackage[parfill]{parskip}
+
+\usepackage{tabularx}
+\usepackage{paralist}
+\usepackage{tikz}
+\usetikzlibrary{arrows,arrows.meta}
+
+\usepackage{amssymb, amsmath, mathtools, bbm, cancel, xfrac} % bbm allow for \mathbbm{#}
+
+\def\EE{\ensuremath{\mathbb{E}}} % expectation
+\def\NN{\ensuremath{\mathbb{N}}} % natural numbers
+\def\PP{\ensuremath{\mathbb{P}}} % probability 
+\def\QQ{\ensuremath{\mathbb{Q}}} % rational numbers
+\def\RR{\ensuremath{\mathbb{R}}} % real numbers
+\def\ZZ{\ensuremath{\mathbb{Z}}} % integers
+
+\def\F{\ensuremath{\mathcal{F}}} % filtration
+\def\I{\ensuremath{\mathcal{I}}} % Fisher information matrix
+\def\L{\ensuremath{\mathcal{L}}} % likelihood function
+\def\N{\ensuremath{\mathcal{N}}} % Gaussian distribution
+
+\newcommand\Var[1]{\ensuremath{\mathrm{Var}\left[#1\right]}} % variance
+\newcommand\Cov[2]{\ensuremath{\mathrm{Cov}\left[#1,#2\right]}} % covariance
+\newcommand\Corr[2]{\ensuremath{\mathrm{Corr}\left[#1,#2\right]}} % correlation
+
+\let\oldlog\log
+\renewcommand{\log}[1]{\oldlog{\left(#1\right)}} % puts parenthesis around \log{}
+
+\usepackage[linesnumbered,lined,boxed]{algorithm2e} % algorithm environment
+\usepackage{xpatch} % forces algo enviro to fit in line width
+	\xpretocmd{\algorithm}{\hsize=\linewidth}{}{}
+	
+\usepackage{listings} % enables pasting code
+
+\allowdisplaybreaks
+
+\usepackage{fancyhdr, color, pgfplots}
+
+\usepgfplotslibrary{fillbetween}
+\usetikzlibrary{patterns}
+\pgfplotsset{compat=1.12}
+
+\definecolor{myorange}{HTML}{EF8B21} % custom orange
+\definecolor{mygreen}{HTML}{6F9A48} % custom green
+\definecolor{myblue}{HTML}{008BA9} % custom blue
+
+\renewcommand{\thefootnote}{\roman{footnote}} % makes footnotes roman numerals
+
+\renewcommand{\abstractname}{Objective}
+
+\pagestyle{fancy}
+\fancyhf{}
+    \rhead{\bf Amir Oskoui \\ Casey Tirshfield}
+    \chead{\bf Project Proposal}
+    \lhead{\bf IEOR 4735 \\ \today}
+    \cfoot{\thepage}
+
+\begin{document}
+	\begin{abstract}
+		\noindent Our objective is to code a pricing routine for a derivative contract paying $(S_T-K)^+$ in USD at a pre-specified expiration date $T$, where $S_T$ is the price of STOXX50E denominated in EUR and K a given strike price in USD. The contract ``knocks-out'' if on a specified date $T_1<T$ the 3-month USD LIBOR is above a known barrier level $L^*$. \\
+		
+		\noindent We will simulate: $$\EE^{\QQ^d}\left[\left.\left(S_f(T)-K\right)^+\cdot\left(\mathbbm{1}_{L_{T_1-T_1+\delta}<L^*}\right)\cdot \left(e^{-\int_t^T r du}\right)\right\vert\F_t\right]$$
+	\end{abstract}
+		
+	\section{Inputs:}
+	We will apply two-factor Monte Carlo to simulate:
+	\begin{equation*}
+		\begin{cases}
+		    \frac{dS}{S} = (r_f-\rho_{SX}\sigma_X\sigma_S)dt+\sigma_S dW^{\QQ^d} \\
+		    dr_d = (\Theta(t)-br)dt + \sigma_r dZ^{\QQ^d}
+	    \end{cases}
+	\end{equation*}
+	where:
+	\begin{align*}
+		r_f: & \quad\textrm{is the constant foreign exchange rate}\\
+		\rho_{SX}: &\quad\textrm{is the historic correlation of the stock and the foreign exchange rate}\\
+		\sigma_X: &\quad\textrm{is the foreign exchange volatility}\\
+		\sigma_S: &\quad\textrm{is the stock volatility. In the foreign currency, we will use a European option price} \\ 
+		&\quad\textrm{to back out $\sigma_S$ from Black Scholes \textit{i.e.} we will obtain the implied volatility using a solver} \\
+		&\quad\textrm{because, by Girsanov's theorem, changing measure does not change volatility.} \\
+		\sigma_r: & \quad\textrm{Assuming known caplet prices (which we will obtain from Bloomberg) we will} \\
+		&\quad\textrm{Use the equation for $C(t,T)$ found on page 386 of Bj\"{o}rk to back out $\sigma_r$ in the same} \\
+		&\quad\textrm{manner as $\sigma_S$.}\footnotemark{}
+	\end{align*}
+
+	\footnotetext{We assume volatility is a piecewise step function}
+	
+	\section{Order of Operations:}
+	
+	\tikzstyle{mbigblock} = [rectangle, draw, text width=13cm, text centered, rounded corners, minimum height=1em]
+	\tikzstyle{block}  = [rectangle, draw, text width=3.5cm, text centered, minimum height=1em]
+	\tikzstyle{lblock} = [rectangle, draw, text width=5cm, text centered, minimum height=1em]
+	\tikzstyle{rblock} = [rectangle, draw, text width=3.5cm, text centered, minimum height=1em]
+	
+	\begin{center}
+		\begin{tikzpicture}[node distance=2cm]
+		\node (m1) [mbigblock] {$r(T)$};
+		\node (m2) [mbigblock,below of=m1,node distance=2cm] {$p(t,T+\delta)$};
+		\node (m3) [mbigblock,below of=m2,node distance=2cm] {$L(t,T,T+\delta)$};
+		
+		\draw[->] (m1) --node[right] {24.48 in Bj\"{o}rk} (m2);
+		\draw[->] (m2) --node[right] {$L(t,T,T+\delta)=\frac{p(t,T)-p(t,T+\delta)}{\delta p(t,T+\delta)}$} (m3);
+		\end{tikzpicture}
+	\end{center}
+	
+	\section{Formulas:}
+	\begin{enumerate}
+		\item Hull-White Term Structure (24.48 in Bj\"{o}rk) $$p(t,T)=\frac{p^*(0,T)}{p^*(0,t)}\exp\left\{B(t,T)f^*(0,t)-\frac{\sigma^2}{4a}B^2(t,T)(1-e^{-2at})-B(t,T)r(t)\right\} $$
+		\item Bond Options (24.9 in Bj\"{o}rk)\footnotemark
+	\end{enumerate}
+	\footnotetext{In Bj\"{o}rk's formula we will assume a mean reversion rate, $a$, of about 3\% or 4\%.}
+	\begin{align*}
+		c(t,T,K,S)&=p(t,S)N(d)-p(t,T)\cdot K \cdot N(d-\sigma_p)
+		\intertext{$\quad\quad\quad\quad$where}
+		d&=\frac{1}{\sigma_p}\mathrm{log}\left\{\frac{p(t,S)}{p(t,T)K}\right\}+\frac{1}{2}\sigma_p, \\
+		\sigma_p &= \frac{1}{a} \left\{1-e^{-a(S-T)}\right\} \cdot \sqrt{\frac{\sigma^2}{2a}\left\{1-e^{-2a(T-t)}\right\}}
+	\end{align*}
+	
+	
+\end{document}
+
